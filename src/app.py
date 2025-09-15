@@ -83,40 +83,9 @@ def root():
     return RedirectResponse(url="/static/index.html")
 
 
-from fastapi import Query
-from typing import Optional, List, Dict
-
 @app.get("/activities")
-def get_activities(
-    search: Optional[str] = Query(None, description="Free text search for activity name or description"),
-    sort: Optional[str] = Query(None, description="Sort by 'name' or 'time'"),
-    order: Optional[str] = Query("asc", description="Sort order: 'asc' or 'desc'"),
-):
-    filtered = activities.copy()
-
-    # Free text search
-    if search:
-        filtered = {
-            k: v for k, v in filtered.items()
-            if search.lower() in k.lower() or search.lower() in v["description"].lower()
-        }
-
-    # Sorting
-    if sort == "name":
-        filtered = dict(sorted(filtered.items(), key=lambda x: x[0], reverse=(order=="desc")))
-    elif sort == "time":
-        # Sort by first time in schedule string (if present)
-        import re
-        def extract_time(s):
-            match = re.search(r'(\d{1,2}:\d{2} ?[AP]M)', s)
-            return match.group(1) if match else ""
-        filtered = dict(sorted(
-            filtered.items(),
-            key=lambda x: extract_time(x[1]["schedule"]),
-            reverse=(order=="desc")
-        ))
-
-    return filtered
+def get_activities():
+    return activities
 
 
 @app.post("/activities/{activity_name}/signup")
