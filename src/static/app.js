@@ -3,15 +3,57 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  
+  // Control elements
+  const searchInput = document.getElementById("search");
+  const sortBySelect = document.getElementById("sort-by");
+  const sortOrderSelect = document.getElementById("sort-order");
+  const availabilityFilter = document.getElementById("availability-filter");
+  const dayFilter = document.getElementById("day-filter");
+  const clearFiltersBtn = document.getElementById("clear-filters");
+
+  // Function to build API URL with filters
+  function buildApiUrl() {
+    const params = new URLSearchParams();
+    
+    if (searchInput.value.trim()) {
+      params.append('search', searchInput.value.trim());
+    }
+    
+    if (sortBySelect.value) {
+      params.append('sort_by', sortBySelect.value);
+      params.append('sort_order', sortOrderSelect.value);
+    }
+    
+    if (availabilityFilter.value !== 'all') {
+      params.append('filter_availability', availabilityFilter.value);
+    }
+    
+    if (dayFilter.value) {
+      params.append('day_filter', dayFilter.value);
+    }
+    
+    return `/activities${params.toString() ? '?' + params.toString() : ''}`;
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
-      const response = await fetch("/activities");
+      const apiUrl = buildApiUrl();
+      const response = await fetch(apiUrl);
       const activities = await response.json();
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      
+      // Clear existing options in activity select (except the first one)
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+      // Check if no activities found
+      if (Object.keys(activities).length === 0) {
+        activitiesList.innerHTML = '<p class="no-results">No activities found matching your criteria.</p>';
+        return;
+      }
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -154,6 +196,36 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
+
+  // Event listeners for filter controls
+  searchInput.addEventListener('input', debounce(fetchActivities, 300));
+  sortBySelect.addEventListener('change', fetchActivities);
+  sortOrderSelect.addEventListener('change', fetchActivities);
+  availabilityFilter.addEventListener('change', fetchActivities);
+  dayFilter.addEventListener('change', fetchActivities);
+  
+  // Clear filters functionality
+  clearFiltersBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    sortBySelect.value = '';
+    sortOrderSelect.value = 'asc';
+    availabilityFilter.value = 'all';
+    dayFilter.value = '';
+    fetchActivities();
+  });
+
+  // Debounce function to limit API calls during typing
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
 
   // Initialize app
   fetchActivities();

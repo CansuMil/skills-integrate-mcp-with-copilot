@@ -5,11 +5,13 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 from pathlib import Path
+from typing import Optional, Literal
+import re
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -84,8 +86,66 @@ def root():
 
 
 @app.get("/activities")
-def get_activities():
-    return activities
+def get_activities(
+    search: Optional[str] = Query(None, description="Search in activity names and descriptions"),
+    sort_by: Optional[Literal["name", "availability", "participants", "schedule"]] = Query(None, description="Sort activities by field"),
+    sort_order: Optional[Literal["asc", "desc"]] = Query("asc", description="Sort order"),
+    filter_availability: Optional[Literal["available", "full", "all"]] = Query("all", description="Filter by availability"),
+    day_filter: Optional[str] = Query(None, description="Filter by schedule day (e.g., 'Monday', 'Tuesday')")
+):
+    """Get activities with optional filtering, sorting, and search"""
+    result = dict(activities)
+    
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        filtered_activities = {}
+        for name, details in result.items():
+            if (search_lower in name.lower() or 
+                search_lower in details["description"].lower()):
+                filtered_activities[name] = details
+        result = filtered_activities
+    
+    # Apply day filter
+    if day_filter:
+        day_lower = day_filter.lower()
+        filtered_activities = {}
+        for name, details in result.items():
+            if day_lower in details["schedule"].lower():
+                filtered_activities[name] = details
+        result = filtered_activities
+    
+    # Apply availability filter
+    if filter_availability != "all":
+        filtered_activities = {}
+        for name, details in result.items():
+            spots_left = details["max_participants"] - len(details["participants"])
+            if filter_availability == "available" and spots_left > 0:
+                filtered_activities[name] = details
+            elif filter_availability == "full" and spots_left == 0:
+                filtered_activities[name] = details
+        result = filtered_activities
+    
+    # Convert to list for sorting
+    activities_list = [{"name": name, **details} for name, details in result.items()]
+    
+    # Apply sorting
+    if sort_by:
+        if sort_by == "name":
+            activities_list.sort(key=lambda x: x["name"].lower())
+        elif sort_by == "availability":
+            activities_list.sort(key=lambda x: x["max_participants"] - len(x["participants"]))
+        elif sort_by == "participants":
+            activities_list.sort(key=lambda x: len(x["participants"]))
+        elif sort_by == "schedule":
+            activities_list.sort(key=lambda x: x["schedule"].lower())
+        
+        if sort_order == "desc":
+            activities_list.reverse()
+    
+    # Convert back to dictionary format for compatibility
+    return {activity["name"]: {k: v for k, v in activity.items() if k != "name"} 
+            for activity in activities_list}
 
 
 @app.post("/activities/{activity_name}/signup")
