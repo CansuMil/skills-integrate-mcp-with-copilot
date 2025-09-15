@@ -3,10 +3,119 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  
+  // Control elements
+  const searchInput = document.getElementById("search");
+  const sortBySelect = document.getElementById("sort-by");
+  const sortOrderSelect = document.getElementById("sort-order");
+  const availabilityFilter = document.getElementById("availability-filter");
+  const dayFilter = document.getElementById("day-filter");
+  const clearFiltersBtn = document.getElementById("clear-filters");
+
+  // Function to build API URL with filters
+  function buildApiUrl() {
+    const params = new URLSearchParams();
+    
+    if (searchInput.value.trim()) {
+      params.append('search', searchInput.value.trim());
+    }
+    
+    if (sortBySelect.value) {
+      params.append('sort_by', sortBySelect.value);
+      params.append('sort_order', sortOrderSelect.value);
+    }
+    
+    if (availabilityFilter.value !== 'all') {
+      params.append('filter_availability', availabilityFilter.value);
+    }
+    
+    if (dayFilter.value) {
+      params.append('day_filter', dayFilter.value);
+    }
+    
+    return `/activities${params.toString() ? '?' + params.toString() : ''}`;
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
+    try {
+      const apiUrl = buildApiUrl();
+      const response = await fetch(apiUrl);
+      const activities = await response.json();
 
+      // Clear loading message
+      activitiesList.innerHTML = "";
+      
+      // Clear existing options in activity select (except the first one)
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+      // Check if no activities found
+      if (Object.keys(activities).length === 0) {
+        activitiesList.innerHTML = '<p class="no-results">No activities found matching your criteria.</p>';
+        return;
+      }
+
+      // Populate activities list
+      Object.entries(activities).forEach(([name, details]) => {
+        const activityCard = document.createElement("div");
+        activityCard.className = "activity-card";
+
+        const spotsLeft =
+          details.max_participants - details.participants.length;
+
+        // Create participants HTML with delete icons instead of bullet points
+        const participantsHTML =
+          details.participants.length > 0
+            ? `<div class="participants-section">
+              <h5>Participants:</h5>
+              <ul class="participants-list">
+                ${details.participants
+                  .map(
+                    (email) =>
+                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                  )
+                  .join("")}
+              </ul>
+            </div>`
+            : `<p><em>No participants yet</em></p>`;
+
+        activityCard.innerHTML = `
+          <h4>${name}</h4>
+          <p>${details.description}</p>
+          <p><strong>Schedule:</strong> ${details.schedule}</p>
+          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-container">
+            ${participantsHTML}
+          </div>
+        `;
+
+        activitiesList.appendChild(activityCard);
+
+        // Add option to select dropdown
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        activitySelect.appendChild(option);
+      });
+
+      // Add event listeners to delete buttons
+      document.querySelectorAll(".delete-btn").forEach((button) => {
+        button.addEventListener("click", handleUnregister);
+      });
+    } catch (error) {
+      activitiesList.innerHTML =
+        "<p>Failed to load activities. Please try again later.</p>";
+      console.error("Error fetching activities:", error);
+    }
+  }
+
+  // Handle unregister functionality
+  async function handleUnregister(event) {
+    const button = event.target;
+    const activity = button.getAttribute("data-activity");
+    const email = button.getAttribute("data-email");
+
+    try {
       const response = await fetch(
         `/activities/${encodeURIComponent(
           activity
@@ -88,12 +197,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Add event listeners for filters
-  if (searchBox) {
-    searchBox.addEventListener("input", () => fetchActivities());
-  }
-  if (sortSelect) {
-    sortSelect.addEventListener("change", () => fetchActivities());
+  // Event listeners for filter controls
+  searchInput.addEventListener('input', debounce(fetchActivities, 300));
+  sortBySelect.addEventListener('change', fetchActivities);
+  sortOrderSelect.addEventListener('change', fetchActivities);
+  availabilityFilter.addEventListener('change', fetchActivities);
+  dayFilter.addEventListener('change', fetchActivities);
+  
+  // Clear filters functionality
+  clearFiltersBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    sortBySelect.value = '';
+    sortOrderSelect.value = 'asc';
+    availabilityFilter.value = 'all';
+    dayFilter.value = '';
+    fetchActivities();
+  });
+
+  // Debounce function to limit API calls during typing
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
   }
 
   // Initialize app
