@@ -1,50 +1,47 @@
+
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
-  const searchInput = document.getElementById("search-input");
-  const sortSelect = document.getElementById("sort-select");
+  const searchInput = document.getElementById("activity-search");
+  const sortSelect = document.getElementById("activity-sort");
+
   let allActivities = {};
+  let filteredActivities = [];
 
-  // Function to fetch activities from API
-  async function fetchActivities() {
-    try {
-      const response = await fetch("/activities");
-      allActivities = await response.json();
-      renderActivities();
-      populateActivitySelect();
-    } catch (error) {
-      activitiesList.innerHTML =
-        "<p>Failed to load activities. Please try again later.</p>";
-      console.error("Error fetching activities:", error);
-    }
-  }
-
+  // Function to render activities based on filter/sort/search
   function renderActivities() {
-    const search = searchInput ? searchInput.value.trim().toLowerCase() : "";
-    const sortBy = sortSelect ? sortSelect.value : "name";
-    let entries = Object.entries(allActivities);
-    if (search) {
-      entries = entries.filter(([name, details]) =>
-        name.toLowerCase().includes(search) ||
-        (details.description && details.description.toLowerCase().includes(search))
-      );
-    }
-    if (sortBy === "name") {
-      entries.sort((a, b) => a[0].localeCompare(b[0]));
-    } else if (sortBy === "spots") {
-      entries.sort((a, b) => {
-        const spotsA = a[1].max_participants - a[1].participants.length;
-        const spotsB = b[1].max_participants - b[1].participants.length;
-        return spotsB - spotsA;
-      });
-    }
     activitiesList.innerHTML = "";
-    entries.forEach(([name, details]) => {
+    activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+
+    // Get search and sort values
+    const searchValue = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    const sortValue = sortSelect ? sortSelect.value : "name";
+
+    // Filter and sort
+    filteredActivities = Object.entries(allActivities)
+      .filter(([name, details]) => {
+        return (
+          name.toLowerCase().includes(searchValue) ||
+          (details.description && details.description.toLowerCase().includes(searchValue))
+        );
+      })
+      .sort((a, b) => {
+        if (sortValue === "name") {
+          return a[0].localeCompare(b[0]);
+        } else if (sortValue === "schedule") {
+          return (a[1].schedule || "").localeCompare(b[1].schedule || "");
+        }
+        return 0;
+      });
+
+    filteredActivities.forEach(([name, details]) => {
       const activityCard = document.createElement("div");
       activityCard.className = "activity-card";
+
       const spotsLeft = details.max_participants - details.participants.length;
+
       const participantsHTML =
         details.participants.length > 0
           ? `<div class="participants-section">
@@ -59,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
               </ul>
             </div>`
           : `<p><em>No participants yet</em></p>`;
+
       activityCard.innerHTML = `
         <h4>${name}</h4>
         <p>${details.description}</p>
@@ -68,21 +66,33 @@ document.addEventListener("DOMContentLoaded", () => {
           ${participantsHTML}
         </div>
       `;
-      activitiesList.appendChild(activityCard);
-    });
-    document.querySelectorAll(".delete-btn").forEach((button) => {
-      button.addEventListener("click", handleUnregister);
-    });
-  }
 
-  function populateActivitySelect() {
-    activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
-    Object.keys(allActivities).forEach((name) => {
+      activitiesList.appendChild(activityCard);
+
+      // Add option to select dropdown
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
       activitySelect.appendChild(option);
     });
+
+    // Add event listeners to delete buttons
+    document.querySelectorAll(".delete-btn").forEach((button) => {
+      button.addEventListener("click", handleUnregister);
+    });
+  }
+
+  // Function to fetch activities from API
+  async function fetchActivities() {
+    try {
+      const response = await fetch("/activities");
+      allActivities = await response.json();
+      renderActivities();
+    } catch (error) {
+      activitiesList.innerHTML =
+        "<p>Failed to load activities. Please try again later.</p>";
+      console.error("Error fetching activities:", error);
+    }
   }
 
   // Handle unregister functionality
@@ -106,8 +116,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response.ok) {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
-
-        // Refresh activities list to show updated participants
         fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
@@ -115,8 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
       setTimeout(() => {
         messageDiv.classList.add("hidden");
       }, 5000);
@@ -127,6 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error unregistering:", error);
     }
   }
+
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
@@ -151,8 +158,6 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
-
-        // Refresh activities list to show updated participants
         fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
@@ -160,8 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
       setTimeout(() => {
         messageDiv.classList.add("hidden");
       }, 5000);
@@ -172,13 +175,16 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
-
-  // Initialize app
-  fetchActivities();
+  // Add event listeners for search and sort
   if (searchInput) {
     searchInput.addEventListener("input", renderActivities);
   }
   if (sortSelect) {
     sortSelect.addEventListener("change", renderActivities);
   }
+
+
+
+  // Initialize app
+  fetchActivities();
 });

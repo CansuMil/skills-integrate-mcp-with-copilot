@@ -13,14 +13,13 @@
     </header>
 
     <main>
-
       <section id="activities-container">
         <h3>Available Activities</h3>
-        <div id="activity-filters" style="margin-bottom: 16px;">
-          <input type="text" id="search-input" placeholder="Search activities..." style="padding: 6px; width: 180px; margin-right: 8px;" />
-          <select id="sort-select" style="padding: 6px; margin-right: 8px;">
+        <div id="activities-toolbar" style="margin-bottom: 1em; display: flex; gap: 1em; align-items: center;">
+          <input type="text" id="activity-search" placeholder="Search activities..." style="flex: 1;" />
+          <select id="activity-sort">
             <option value="name">Sort by Name</option>
-            <option value="spots">Sort by Availability</option>
+            <option value="schedule">Sort by Schedule</option>
           </select>
         </div>
         <div id="activities-list">
